@@ -1,64 +1,72 @@
-ancovatest <- function(df, factor, grouping) {
+ancova.test <- function(df, factor, covar, trim = TRUE) {
+  ##Prepare a blank data.frame for results
   result <-
     data.frame(
       "ID" = colnames(df),
       "p.value" = NA,
       "Adj.p.value" = NA,
-      "Fold.change.C/V" = NA,
       stringsAsFactors = FALSE
     )
+  for (i in levels(factor)) {
+    result[i] = NA
+  }
+  ##Prepare the formula used by ANCOVA
+  fml_w_factor = as.formula(paste0("df[, i] ~ factor + ", paste(covar, collapse = " + ")))
+  fml_wo_factor = as.formula(paste0("df[, i] ~ ", paste(covar, collapse = " + ")))
+  ##Perform ANCOVA
   for (i in 1:ncol(df)) {
     if (sum(df[, i], na.rm = T) == 0) {
       next()
     }
     temp <-
-      anova(
-        lm(
-          df[, i] ~ factor + dataset_p1_feces_all$grouping$age + dataset_p1_feces_all$grouping$sex
-        ),
-        lm(
-          df[, i] ~ dataset_p1_feces_all$grouping$age + dataset_p1_feces_all$grouping$sex
-        )
-      )
+      anova(lm(fml_w_factor), lm(fml_wo_factor))
     result[i, 2] <- temp$Pr[2]
-    result[i, 4] <-
-      log2(mean(subset(df[, i], grouping == "C")) / mean(subset(df[, i], grouping == "V")))
+    for (j in 4:ncol(result)) {
+      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j-3]))
+    }
   }
-  result <- result[complete.cases(result[, 2]), ]
+  if (trim) {
+    result <- result[complete.cases(result[, 2]), ]
+  }
   result$Adj.p.value <- p.adjust(result$p.value, method = "fdr")
-  result <- subset(result, subset = result$Adj.p.value < 0.05)
   
   return(result)
 }
 
-anovatest <- function(df, factor, grouping) {
+anova.test <- function(df, factor, trim = TRUE) {
+  ##Prepare a blank data.frame for results
   result <-
     data.frame(
       "ID" = colnames(df),
       "p.value" = NA,
       "Adj.p.value" = NA,
-      "Fold.change.C/V" = NA,
       stringsAsFactors = FALSE
     )
+  for (i in levels(factor)) {
+    result[i] = NA
+  }
+  ##Perform ANOVA
   for (i in 1:ncol(df)) {
     if (sum(df[, i], na.rm = T) == 0) {
       next()
     }
     temp <- anova(lm(df[, i] ~ factor))
     result[i, 2] <- temp$Pr[1]
-    result[i, 4] <-
-      log2(mean(subset(df[, i], grouping == "C")) / mean(subset(df[, i], grouping == "V")))
+    for (j in 4:ncol(result)) {
+      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j-3]))
+    }
   }
-  result <- result[complete.cases(result[, 2]),]
+  if (trim) {
+    result <- result[complete.cases(result[, 2]), ]
+  }
   result$Adj.p.value <- p.adjust(result$p.value, method = "fdr")
-  result <- subset(result, subset = result$Adj.p.value < 0.05)
   
   return(result)
 }
 
 b.diver <-
   function(df,
-           grouping,
+           factor,
            method = "bray",
            pal = "Dark2")
   {
@@ -66,10 +74,10 @@ b.diver <-
     library(ggplot2)
     library(ggpubr)
     library(foreach)
-    
+    ##Split the input data.frame by the factor
     dist_list <-
-      foreach(i = levels(grouping), .combine = "rbind") %do% {
-        df_sub <- subset(df, subset = grouping == i)
+      foreach(i = levels(factor), .combine = "rbind") %do% {
+        df_sub <- subset(df, subset = factor == i)
         dist_sub <-
           as.data.frame(as.numeric(vegdist(df_sub, method = method)))
         dist_sub["group"] = i
@@ -79,31 +87,47 @@ b.diver <-
     
     result <- list()
     
-    result["test"] <-
-      list(wilcox.test(dist ~ group, data = dist_list))
-    test <-
-      data.frame(
-        group1 = levels(grouping)[1],
-        group2 = levels(grouping)[2],
-        p = result$test$p.value,
-        y.position = max(dist_list$dist) * 1.02,
-        p.signif = NA
+    if (length(levels(factor)) == 2) {
+      ##While there are two groups in the factor
+      result["test"] <-
+        list(wilcox.test(dist ~ group, data = dist_list))
+      test <-
+        data.frame(
+          group1 = levels(factor)[1],
+          group2 = levels(factor)[2],
+          p = result$test$p.value,
+          y.position = max(dist_list$dist) * 1.02,
+          p.signif = NA
+        )
+      if (test$p >= 0.05) {
+        test$p.signif = "ns"
+      } else if (test$p >= 0.01) {
+        test$p.signif = "*"
+      } else if (test$p >= 0.001) {
+        test$p.signif = "**"
+      } else {
+        test$p.signif = "***"
+      }
+      
+      result["plot"] <- list(
+        ggplot(dist_list, aes(x = group, y = dist))
+        + scale_fill_brewer(palette = pal)
+        + geom_boxplot(aes(fill = group))
+        + labs(y = "Beta Diversity")
+        + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
       )
-    if (test$p >= 0.05) {
-      test$p.signif = "ns"
-    } else if (test$p >= 0.01) {
-      test$p.signif = "*"
-    } else if (test$p >= 0.001) {
-      test$p.signif = "**"
     } else {
-      test$p.signif = "***"
+      ##While there are three or more groups in the factor
+      result["test"] <-
+        list(kruskal.test(dist ~ group, data = dist_list))
+      
+      result["plot"] <- list(
+        ggplot(dist_list, aes(x = group, y = dist))
+        + scale_fill_brewer(palette = pal)
+        + geom_boxplot(aes(fill = group))
+        + labs(y = "Beta Diversity")
+      )
     }
-    
-    result["plot"] <- list(
-      ggplot(dist_list,
-             aes(x = group,
-                 y = dist)) + scale_fill_brewer(palette = pal) + geom_boxplot(aes(fill = group)) + labs(y = "Beta Diversity") + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
-    )
     
     return(result)
   }
