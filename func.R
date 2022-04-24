@@ -22,7 +22,7 @@ ancova.test <- function(df, factor, covar, trim = TRUE) {
       anova(lm(fml_w_factor), lm(fml_wo_factor))
     result[i, 2] <- temp$Pr[2]
     for (j in 4:ncol(result)) {
-      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j-3]))
+      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j - 3]))
     }
   }
   if (trim) {
@@ -53,7 +53,7 @@ anova.test <- function(df, factor, trim = TRUE) {
     temp <- anova(lm(df[, i] ~ factor))
     result[i, 2] <- temp$Pr[1]
     for (j in 4:ncol(result)) {
-      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j-3]))
+      result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j - 3]))
     }
   }
   if (trim) {
@@ -150,9 +150,12 @@ build.network <- function(cor_matrix, p_matrix) {
   cor_p_table <- cor_p_table[, c("ID1", "ID2", "cor", "p")]
   cor_p_table$p <- p.adjust(cor_p_table$p, method = "BH")
   cor_p_table <- subset(cor_p_table, subset = cor_p_table$p < 0.05)
-  cor_p_table <- subset(cor_p_table, subset = abs(cor_p_table$cor) < 0.9999)
-  cor_p_table <- subset(cor_p_table, subset = abs(cor_p_table$cor) > 0.6)
-  network_graph <- graph_from_edgelist(as.matrix(cor_p_table[, 1:2]), directed = F)
+  cor_p_table <-
+    subset(cor_p_table, subset = abs(cor_p_table$cor) < 0.9999)
+  cor_p_table <-
+    subset(cor_p_table, subset = abs(cor_p_table$cor) > 0.6)
+  network_graph <-
+    graph_from_edgelist(as.matrix(cor_p_table[, 1:2]), directed = F)
   E(network_graph)$weight = abs(cor_p_table$cor)
   network_graph <- simplify(network_graph)
   
@@ -175,77 +178,40 @@ build.network <- function(cor_matrix, p_matrix) {
 }
 
 dataset.subset <- function (dataset, factor, subset) {
-  result <- list()
-  result["profile"] <- list()
+  library(foreach)
   
-  result$profile["mgs"] <- list(subset(dataset$profile$mgs,
-                                       factor %in% subset))
-  result$profile$mgs <-
-    result$profile$mgs[, which(colSums(result$profile$mgs) > 0)]
-  result$profile["species"] <- list(subset(dataset$profile$species,
-                                           factor %in% subset))
-  result$profile$species <-
-    result$profile$species[, which(colSums(result$profile$species) > 0)]
-  result$profile["genus"] <- list(subset(dataset$profile$genus,
-                                         factor %in% subset))
-  result$profile$genus <-
-    result$profile$genus[, which(colSums(result$profile$genus) > 0)]
-  result$profile["ko"] <- list(subset(dataset$profile$ko,
-                                      factor %in% subset))
-  result$profile$ko <-
-    result$profile$ko[, which(colSums(result$profile$ko) > 0)]
-  result$profile["cazy"] <- list(subset(dataset$profile$cazy,
-                                        factor %in% subset))
-  result$profile$cazy <-
-    result$profile$cazy[, which(colSums(result$profile$cazy) > 0)]
-  result$profile["card"] <- list(subset(dataset$profile$card,
-                                        factor %in% subset))
-  result$profile$card <-
-    result$profile$card[, which(colSums(result$profile$card) > 0)]
-  result$profile["diets"] <- list(subset(dataset$profile$diet,
-                                         factor %in% subset))
-  result$profile$diets <-
-    result$profile$diets[, which(colSums(result$profile$diets) > 0)]
-  result["grouping"] <-
-    list(subset(dataset$grouping, factor %in% subset))
-  result["metrics"] <-
-    list(subset(dataset$metrics, factor %in% subset))
-  result["shannon"] <-
-    list(subset(dataset$shannon, factor %in% subset))
-  result["richness"] <-
-    list(subset(dataset$richness, factor %in% subset))
-  result["evenness"] <-
-    list(subset(dataset$evenness, factor %in% subset))
-  result["clinical"] <-
-    list(subset(dataset$clinical, factor %in% subset))
+  result <- list()
+  
+  for (i in names(dataset)) {
+    if (is.list(dataset[[i]])) {
+      result[[i]] <- foreach (j = dataset[[i]]) %do% {
+        subset(j, subset = factor %in% subset)
+      }
+      names(result[[i]]) = names(dataset[[i]])
+    } else {
+      result[i] <- list(subset(dataset[i], subset = factor %in% subset))
+    }
+  }
+  
   return(result)
 }
 
 dataset.trim <- function (dataset, factor) {
+  library(foreach)
+  
   result <- list()
-  result["profile"] <- list()
-  result$profile["diets"] <- list(subset(dataset$profile$diet,
-                                         subset = !is.na(factor)))
-  result$profile["phylum"] <- list(subset(dataset$profile$phylum,
-                                          subset = !is.na(factor)))
-  result$profile["genus"] <- list(subset(dataset$profile$genus,
-                                         subset = !is.na(factor)))
-  result$profile["species"] <- list(subset(dataset$profile$species,
-                                           subset = !is.na(factor)))
-  result$profile["mgs"] <- list(subset(dataset$profile$mgs,
-                                       subset = !is.na(factor)))
-  result["grouping"] <-
-    list(subset(dataset$grouping, subset = !is.na(factor)))
-  result["metrics"] <-
-    list(subset(dataset$metrics, subset = !is.na(factor)))
-  result["shannon"] <-
-    list(subset(dataset$shannon, subset = !is.na(factor)))
-  result["richness"] <-
-    list(subset(dataset$richness, subset = !is.na(factor)))
-  result["evenness"] <-
-    list(subset(dataset$evenness, subset = !is.na(factor)))
-  result["clinical"] <-
-    list(subset(dataset$clinical, subset = !is.na(factor)))
+  
+  for (i in names(dataset)) {
+    if (is.list(dataset[[i]])) {
+      result[[i]] <- foreach (j = dataset[[i]]) %do% {
+        subset(j, subset = !is.na(factor))
+      }
+      names(result[[i]]) = names(dataset[[i]])
+    } else {
+      result[i] <- list(subset(dataset[i], subset = !is.na(factor)))
+    }
+  }
+  
   return(result)
 }
 
@@ -256,23 +222,27 @@ metric.individual <-
            factor,
            method = "wilcox",
            paired = FALSE,
-           pal = "Dark2") {
+           pal = "Dark2",
+           lab.x = NULL,
+           lab.legend = NULL) {
     library(vegan)
     library(ggplot2)
     library(ggpubr)
     library(foreach)
     
     result <- list()
-    
+    ##Perform statistical tests
     if (method == "t") {
       groups <- levels(factor(grouping))
       result$test <- foreach(i = groups) %do% {
         if (var.test(df[, which(colnames(df) == value)] ~ factor,
                      subset = grouping == i)$p.value > 0.05) {
-          t.test(df[, which(colnames(df) == value)] ~ factor,
-                 subset = grouping == i,
-                 paired = paired,
-                 var.equal = T)
+          t.test(
+            df[, which(colnames(df) == value)] ~ factor,
+            subset = grouping == i,
+            paired = paired,
+            var.equal = T
+          )
         } else {
           t.test(df[, which(colnames(df) == value)] ~ factor,
                  subset = grouping == i,
@@ -289,6 +259,7 @@ metric.individual <-
       }
       names(result$test) <- groups
     }
+    ##Prepare data for labels of significance
     test <-
       data.frame(
         grouping = groups,
@@ -310,16 +281,18 @@ metric.individual <-
         test$p.signif[i] = "***"
       }
     }
-    
+    ##Plotting
     result["plot"] <- list(
-      ggplot(df,
-             aes(x = grouping,
-                 y = df[, which(colnames(df) == value)])) + scale_fill_brewer(palette = pal) + geom_boxplot(aes(fill = factor)) + labs(y = value) + stat_pvalue_manual(
-                   test,
-                   label = "p.signif",
-                   x = "grouping",
-                   hide.ns = T
-                 )
+      ggplot(df, aes(x = grouping, y = df[, which(colnames(df) == value)]))
+      + scale_fill_brewer(palette = pal)
+      + geom_boxplot(aes(fill = factor))
+      + labs(y = value, x = lab.x, fill = lab.legend)
+      + stat_pvalue_manual(
+        test,
+        label = "p.signif",
+        x = "grouping",
+        hide.ns = T
+      )
     )
     
     return(result)
@@ -330,8 +303,10 @@ metric.overall <-
             value,
             factor,
             method = "wilcox",
+            paired = FALSE,
             pal = "Dark2",
-            paired = F) {
+            lab.x = NULL,
+            lab.legend = NULL) {
     library(vegan)
     library(ggplot2)
     library(ggpubr)
@@ -379,7 +354,11 @@ metric.overall <-
     result["plot"] <- list(
       ggplot(df,
              aes(x = factor,
-                 y = df[, which(colnames(df) == value)])) + scale_fill_brewer(palette = pal) + geom_boxplot(aes(fill = factor)) + labs(y = value) + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
+                 y = df[, which(colnames(df) == value)]))
+      + scale_fill_brewer(palette = pal)
+      + geom_boxplot(aes(fill = factor))
+      + labs(y = value, x = lab.x, fill = lab.legend)
+      + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
     )
     
     return(result)
@@ -469,11 +448,12 @@ pathway.cov <- function(ko_list) {
   
   cl <- makeCluster(detectCores(), methods = F, useXDR = F)
   registerDoParallel(cl, cores = length(cl))
-  result <- foreach(pathway = t(pathway_list), .combine = "c") %dopar% {
-    ko <- unlist(strsplit(pathway[3], split = ","))
-    sig_ko <- subset(ko, subset = ko %in% ko_list)
-    cov <- length(sig_ko) / as.numeric(pathway[2])
-  }
+  result <-
+    foreach(pathway = t(pathway_list), .combine = "c") %dopar% {
+      ko <- unlist(strsplit(pathway[3], split = ","))
+      sig_ko <- subset(ko, subset = ko %in% ko_list)
+      cov <- length(sig_ko) / as.numeric(pathway[2])
+    }
   stopCluster(cl)
   
   return(result)
@@ -502,17 +482,20 @@ pcoa.plot <-
                        y = pco[, 2],
                        color = color,
                        shape = shape
-                     )) + 
-      scale_shape_manual(values = shape_palette) + 
-      scale_color_brewer(palette = pal) + 
-      geom_point(size = 2, alpha = 0.6) + 
-      stat_ellipse(level = conf) + 
-      xlab(colnames(pco)[1]) + 
+                     )) +
+      scale_shape_manual(values = shape_palette) +
+      scale_color_brewer(palette = pal) +
+      geom_point(size = 2, alpha = 0.6) +
+      stat_ellipse(level = conf) +
+      xlab(colnames(pco)[1]) +
       ylab(colnames(pco)[2])
     return(result)
   }
 
-permtest <- function(df, factor, cutoff = 0.05, alt = "two.sided") {
+permtest <- function(df,
+                     factor,
+                     cutoff = 0.05,
+                     alt = "two.sided") {
   library(foreach)
   library(doParallel)
   
@@ -640,7 +623,8 @@ z.score.rep <- function(df, factor, cutoff = 0.95, pathway_list) {
       temp = 0
       set.seed(125)
       for (j in 1:1000) {
-        temp[j] <- sum(sample(temp_test$Z.score, pathway_list$ko_count[i])) / sqrt(pathway_list$ko_count[i])
+        temp[j] <-
+          sum(sample(temp_test$Z.score, pathway_list$ko_count[i])) / sqrt(pathway_list$ko_count[i])
       }
       (temp_z[i] - mean(temp)) / sd(temp)
     }
@@ -656,4 +640,3 @@ z.score.rep <- function(df, factor, cutoff = 0.95, pathway_list) {
   
   return(result)
 }
-
