@@ -68,7 +68,9 @@ b.diver <-
   function(df,
            factor,
            method = "bray",
-           pal = "Dark2")
+           pal = "Dark2",
+           lab.x = NULL,
+           lab.legend = NULL)
   {
     library(vegan)
     library(ggplot2)
@@ -110,11 +112,11 @@ b.diver <-
       }
       
       result["plot"] <- list(
-        ggplot(dist_list, aes(x = group, y = dist))
-        + scale_fill_brewer(palette = pal)
-        + geom_boxplot(aes(fill = group))
-        + labs(y = "Beta Diversity")
-        + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
+        ggplot(dist_list, aes(x = group, y = dist)) +
+          scale_fill_brewer(palette = pal) +
+          geom_boxplot(aes(fill = group)) +
+          labs(x = lab.x, y = "Beta Diversity", fill = lab.legend) +
+          stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
       )
     } else {
       ##While there are three or more groups in the factor
@@ -125,7 +127,7 @@ b.diver <-
         ggplot(dist_list, aes(x = group, y = dist)) +
           scale_fill_brewer(palette = pal) +
           geom_boxplot(aes(fill = group)) +
-          labs(y = "Beta Diversity") +
+          labs(x = lab.x, y = "Beta Diversity", fill = lab.legend)
       )
     }
     
