@@ -622,14 +622,14 @@ unique.find <- function(df, factor, subset) {
   return(result)
 }
 
-z.score.rep <- function(df, factor, cutoff = 0.95, pathway_list) {
+z.score.rep <- function(df, factor, cutoff = 0.95, cov = 0.5, pathway_list) {
   library(foreach)
   library(doParallel)
   
-  temp_test <- permtest(df,
-                        factor,
-                        cutoff = 1,
-                        alt = "greater")
+  temp_test <- two.way.test(df,
+                            factor,
+                            method = "perm",
+                            alt = "greater")
   temp_test$Z.score <- qnorm(1 - temp_test$p.value)
   temp_test <- subset(temp_test, subset = temp_test$Z.score > -Inf)
   
@@ -656,9 +656,8 @@ z.score.rep <- function(df, factor, cutoff = 0.95, pathway_list) {
   result <- as.data.frame(cbind(temp_z, temp_z.adj, temp_cov))
   colnames(result) <- c("z.score", "z.score.adj", "pathway.cov")
   
-  result <- subset(result, subset = pathway.cov > 0.5)
-  result <-
-    subset(result, subset = abs(result$z.score.adj) > qnorm(1 - (1 - cutoff) / 2))
+  result <- subset(result, subset = pathway.cov > cov)
+  result <- subset(result, subset = abs(result$z.score.adj) > qnorm(1 - (1 - cutoff) / 2))
   
   return(result)
 }
