@@ -417,8 +417,11 @@ nmds.plot <-
            shape,
            method = "bray",
            shape_palette = c(10, 15),
-           pal = "Set3",
-           conf = 0.95)
+           pal = "Dark2",
+           conf = 0.95,
+           alpha = 0.8,
+           lab.shape = NULL,
+           lab.color = NULL)
   {
     library(vegan)
     library(ggplot2)
@@ -434,11 +437,16 @@ nmds.plot <-
                      )) +
       scale_shape_manual(values = shape_palette) +
       scale_color_brewer(palette = pal) +
-      geom_point(size = 2, alpha = 1) +
+      geom_point(size = 2, alpha = alpha) +
       stat_ellipse(level = conf) +
-      xlab(colnames(mds)[1]) +
-      ylab(colnames(mds)[2]) +
-      labs(title = paste("Stress =", round(temp$stress, 4)))
+      labs(
+        x = colnames(mds)[1],
+        y = colnames(mds)[2],
+        color = lab.color,
+        shape = lab.shape,
+        title = paste("Stress =", round(temp$stress, 4)),
+        
+      )
     return(result)
   }
 
@@ -466,29 +474,38 @@ pcoa.plot <-
            method = "bray",
            pal = "Dark2",
            shape_palette = c(10, 15),
-           conf = 0.95)
+           conf = 0.95,
+           alpha = 0.8,
+           lab.shape = NULL,
+           lab.color = NULL)
   {
     library(vegan)
     library(ggplot2)
     
     dm <- vegdist(df, method = method)
-    pco_list <- cmdscale(dm, k = 3, eig = T)
+    pco_list <- cmdscale(dm, k = 2, eig = T)
     pco <- as.data.frame(pco_list$points)
-    eig <- signif(pco_list$eig / sum(pco_list$eig) * 100, 3)
-    colnames(pco) = paste("PCo", 1:3, ": ", eig[1:3], "%", sep = "")
-    result <- ggplot(pco,
-                     aes(
-                       x = pco[, 1],
-                       y = pco[, 2],
-                       color = color,
-                       shape = shape
-                     )) +
+    eig <- signif(pco_list$eig / sum(pco_list$eig) * 100, 2)
+    colnames(pco) = paste("PCo", 1:2, ": ", eig[1:2], "%", sep = "")
+    
+    result <-
+      ggplot(pco, aes(
+        x = pco[, 1],
+        y = pco[, 2],
+        color = color,
+        shape = shape
+      )) +
       scale_shape_manual(values = shape_palette) +
       scale_color_brewer(palette = pal) +
-      geom_point(size = 2, alpha = 0.6) +
+      geom_point(size = 2, alpha = alpha) +
       stat_ellipse(level = conf) +
-      xlab(colnames(pco)[1]) +
-      ylab(colnames(pco)[2])
+      labs(
+        x = colnames(pco)[1],
+        y = colnames(pco)[2],
+        color = lab.color,
+        shape = lab.shape
+      )
+    
     return(result)
   }
 
