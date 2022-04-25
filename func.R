@@ -511,111 +511,114 @@ pcoa.plot <-
     return(result)
   }
 
-permtest <- function(df,
-                     factor,
-                     cutoff = 0.05,
-                     alt = "two.sided") {
-  library(foreach)
-  library(doParallel)
+two.way.test <- function(df,
+                         factor,
+                         method = "wilcox",
+                         alt = "two.sided",
+                         paired = TRUE,
+                         trim = TRUE) {
   
+  ##Prepare a blank data.frame for results
   result <-
     data.frame(
       "ID" = colnames(df),
       "p.value" = NA,
       "Adj.p.value" = NA,
-      "Fold.change.C/V" = NA,
+      "Fold.change" = NA,
       stringsAsFactors = FALSE
     )
-  
-  cl <- makeCluster(detectCores(), methods = F, useXDR = F)
-  registerDoParallel(cl)
-  test <- foreach (
-    i = 1:ncol(df),
-    .packages = c("foreach", "perm"),
-    .errorhandling = "pass",
-    .inorder = F
-  ) %dopar% {
-    temp <- foreach(j = levels(factor)) %do% {
-      as.data.frame(prop.table(table(subset(
-        df[, i], factor == j
-      ))))
-    }
-    foreach(k = temp) %do% {
-      if (length(which(k$Var1 == 0)) != 0) {
-        if (k[which(k$Var1 == 0), ]$Freq > 0.9) {
-          stop()
+  temp = paste(levels(factor), collapse = "/")
+  colnames(result)[4] = paste0("Fold.change.", temp)
+  ##Perform the tests
+  ####ATTENTION: Permutation test (method = "perm") will ignore variables which has a prevalence less than 0.1 in either group.
+  if (method == "perm") {
+    library(foreach)
+    library(doParallel)
+    
+    cl <- makeCluster(detectCores(), methods = F, useXDR = F)
+    registerDoParallel(cl)
+    test <- foreach (
+      i = 1:ncol(df),
+      .packages = c("foreach", "perm"),
+      .errorhandling = "pass",
+      .inorder = F
+    ) %dopar% {
+      temp <- foreach(j = levels(factor)) %do% {
+        as.data.frame(proportions(table(subset(
+          df[, i], factor == j
+        ))))
+      }
+      foreach(k = temp) %do% {
+        if (length(which(k$Var1 == 0)) != 0) {
+          if (k[which(k$Var1 == 0),]$Freq > 0.9) {
+            stop()
+          }
         }
       }
+      permTS(df[, i] ~ factor, alternative = alt)
     }
-    permTS(df[, i] ~ factor, alternative = alt)
-  }
-  stopCluster(cl)
-  for (i in 1:length(test)) {
-    if (is.null(test[[i]]$p.value)) {
-      result[i, 2] <- NA
-    } else {
-      result[i, 2] <- test[[i]]$p.value
+    stopCluster(cl)
+    for (i in 1:length(test)) {
+      if (is.null(test[[i]]$p.value)) {
+        result[i, 2] <- NA
+      } else {
+        result[i, 2] <- test[[i]]$p.value
+      }
+      result[i, 4] <-
+        log2(mean(subset(df[, i], factor == levels(factor)[1])) / mean(subset(df[, i], factor == levels(factor)[2])))
     }
-    result[i, 4] <-
-      log2(mean(subset(df[, i], factor == "C")) / mean(subset(df[, i], factor == "V")))
-  }
-  
-  result <- result[complete.cases(result[, 2]),]
-  result$Adj.p.value <- p.adjust(result$p.value, method = "fdr")
-  result <- subset(result, subset = result$Adj.p.value < cutoff)
-  
-  return(result)
-}
-
-ttest <- function(df, factor) {
-  library(vegan)
-  
-  result <-
-    data.frame(
-      "ID" = colnames(df),
-      "p.value" = NA,
-      "Adj.p.value" = NA,
-      "Fold.change.C/V" = NA,
-      stringsAsFactors = FALSE
-    )
-  for (i in 1:ncol(df)) {
-    if (sum(df[, i]) == 0) {
-      next()
+  } else if (method == "t") {
+    for (i in 1:ncol(df)) {
+      if (sum(df[, i]) == 0) {
+        next()
+      }
+      if (var.test(df[, i] ~ factor)$p.value > 0.05) {
+        temp <- t.test(df[, i] ~ factor,
+                       var.equal = T, paired = paired)
+        result[i, 2] <- temp$p.value
+        result[i, 4] <-
+          log2(mean(subset(df[, i], factor == levels(factor)[1])) / mean(subset(df[, i], factor == levels(factor)[2])))
+      } else {
+        temp <- t.test(df[, i] ~ factor)
+        result[i, 2] <- temp$p.value
+        result[i, 4] <-
+          log2(mean(subset(df[, i], factor == levels(factor)[1])) / mean(subset(df[, i], factor == levels(factor)[2])))
+      }
     }
-    if (var.test(df[, i] ~ factor)$p.value > 0.05) {
-      temp <- t.test(df[, i] ~ factor,
-                     var.equal = T)
+  } else if (method == "wilcox") {
+    for (i in 1:ncol(df)) {
+      if (sum(df[, i]) == 0) {
+        next()
+      }
+      temp <-
+        wilcox.test(df[, i] ~ factor, var.equal = T, paired = paired)
       result[i, 2] <- temp$p.value
       result[i, 4] <-
-        log2(as.numeric(temp$estimate["mean in group C"] / temp$estimate["mean in group V"]))
-    } else {
-      temp <- t.test(df[, i] ~ factor)
-      result[i, 2] <- temp$p.value
-      result[i, 4] <-
-        log2(as.numeric(temp$estimate["mean in group C"] / temp$estimate["mean in group V"]))
+        log2(mean(subset(df[, i], factor == levels(factor)[1])) / mean(subset(df[, i], factor == levels(factor)[2])))
     }
   }
-  result <- result[complete.cases(result[, 2]),]
+  
+  if (trim) {
+    result <- result[complete.cases(result[, 2]), ]
+  }
   result$Adj.p.value <- p.adjust(result$p.value, method = "fdr")
   
   return(result)
 }
 
-unique.find <- function(df, grouping, subset, id = "ID") {
-  result <- data.frame(id = NA, mean = 0)
-  colnames(result)[1] <- id
+unique.find <- function(df, factor, subset) {
+  result <- data.frame("ID" = NA, "Mean" = 0, "Prevalence" = 0)
+  
   for (i in 1:ncol(df)) {
-    if (sum(subset(df[, i],
-                   subset = grouping != subset)) == 0) {
-      result <-
-        rbind(result, c(colnames(df)[i],
-                        mean(
-                          subset(df[, i],
-                                 subset = grouping == subset)
-                        )))
+    if (sum(subset(df[, i], subset = factor != subset)) == 0) {
+      temp <- as.data.frame(proportions(table(subset(
+        df[, i], factor == subset
+      ))))
+      result <- rbind(result, c(colnames(df)[i], mean(subset(df[, i], subset = factor == subset)), temp$Freq))
     }
   }
   result <- result[-1, ]
+  
   return(result)
 }
 
