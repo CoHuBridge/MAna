@@ -122,10 +122,10 @@ b.diver <-
         list(kruskal.test(dist ~ group, data = dist_list))
       
       result["plot"] <- list(
-        ggplot(dist_list, aes(x = group, y = dist))
-        + scale_fill_brewer(palette = pal)
-        + geom_boxplot(aes(fill = group))
-        + labs(y = "Beta Diversity")
+        ggplot(dist_list, aes(x = group, y = dist)) +
+          scale_fill_brewer(palette = pal) +
+          geom_boxplot(aes(fill = group)) +
+          labs(y = "Beta Diversity") +
       )
     }
     
@@ -283,11 +283,11 @@ metric.individual <-
     }
     ##Plotting
     result["plot"] <- list(
-      ggplot(df, aes(x = grouping, y = df[, which(colnames(df) == value)]))
-      + scale_fill_brewer(palette = pal)
-      + geom_boxplot(aes(fill = factor))
-      + labs(y = value, x = lab.x, fill = lab.legend)
-      + stat_pvalue_manual(
+      ggplot(df, aes(x = grouping, y = df[, which(colnames(df) == value)])) +
+      scale_fill_brewer(palette = pal) +
+      geom_boxplot(aes(fill = factor)) +
+      labs(y = value, x = lab.x, fill = lab.legend) +
+      stat_pvalue_manual(
         test,
         label = "p.signif",
         x = "grouping",
@@ -354,11 +354,11 @@ metric.overall <-
     result["plot"] <- list(
       ggplot(df,
              aes(x = factor,
-                 y = df[, which(colnames(df) == value)]))
-      + scale_fill_brewer(palette = pal)
-      + geom_boxplot(aes(fill = factor))
-      + labs(y = value, x = lab.x, fill = lab.legend)
-      + stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
+                 y = df[, which(colnames(df) == value)])) +
+      scale_fill_brewer(palette = pal) +
+      geom_boxplot(aes(fill = factor)) +
+      labs(y = value, x = lab.x, fill = lab.legend) +
+      stat_pvalue_manual(test, label = "p.signif", hide.ns = T)
     )
     
     return(result)
