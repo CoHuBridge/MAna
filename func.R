@@ -413,6 +413,44 @@ multi.co.adonis <-
     return(pairw.res)
   }
 
+multi.way.test <- function(df,
+                           factor,
+                           method = "kw",
+                           trim = TRUE) {
+  ##Prepare a blank data.frame for results
+  result <-
+    data.frame(
+      "ID" = colnames(df),
+      "p.value" = NA,
+      "Adj.p.value" = NA,
+      stringsAsFactors = FALSE
+    )
+  for (i in levels(factor)) {
+    result[i] = NA
+  }
+  ##Perform the tests
+  if (method == "kw") {
+    for (i in 1:ncol(df)) {
+      if (sum(df[, i]) == 0) {
+        next()
+      }
+      temp <-
+        kruskal.test(df[, i] ~ factor)
+      result[i, 2] <- temp$p.value
+      for (j in 4:ncol(result)) {
+        result[i, j] = mean(subset(df[, i], subset = factor == levels(factor)[j - 3]))
+      }
+    }
+  }
+  
+  if (trim) {
+    result <- result[complete.cases(result[, 2]),]
+  }
+  result$Adj.p.value <- p.adjust(result$p.value, method = "fdr")
+  
+  return(result)
+}
+
 nmds.plot <-
   function(df,
            color,
@@ -614,7 +652,7 @@ unique.find <- function(df, factor, subset) {
       temp <- as.data.frame(proportions(table(subset(
         df[, i], factor == subset
       ))))
-      result <- rbind(result, c(colnames(df)[i], mean(subset(df[, i], subset = factor == subset)), temp$Freq))
+      result <- rbind(result, c(colnames(df)[i], mean(subset(df[, i], subset = factor == subset)), 1 - temp$Freq))
     }
   }
   result <- result[-1, ]
